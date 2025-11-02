@@ -1169,9 +1169,22 @@ FileDiskDeviceControl (
                     for (ULONG i = 0; i < rangeCount; ++i) {
                         ULONGLONG start = ranges[i].StartingOffset;
                         ULONGLONG len   = ranges[i].LengthInBytes;
+
+                        IO_STATUS_BLOCK zd_iosb = { 0 };
+                        FILE_ZERO_DATA_INFORMATION zd_in = {0};
+                        zd_in.FileOffset.QuadPart      = start;
+                        zd_in.BeyondFinalZero.QuadPart = start+len;
+                        status = ZwFsControlFile(
+                            device_extension->file_handle,
+                            NULL, NULL, NULL, &zd_iosb,
+                            FSCTL_SET_ZERO_DATA,
+                            &zd_in, sizeof(zd_in),
+                            NULL, 0
+                        );
                         KdPrint(("FileDisk: "
-                            "DeviceDsmAction_Trim: range[%lu]: start=%llu, len=%llu",
-                            i, start, len));
+                            "DeviceDsmAction_Trim: range[%lu]: "
+                            "start=%llu, len=%llu, status=0x%lx",
+                            i, start, len, (long)status));
                     }
 
                     status = STATUS_SUCCESS;
