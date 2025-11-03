@@ -795,7 +795,7 @@ FileDiskDeviceControl (
             }
             else
             {
-                sector_size = 512;
+                sector_size = 4096;
             }
 
 #define FILEDISK_SECTORSPERTRACK 32LL
