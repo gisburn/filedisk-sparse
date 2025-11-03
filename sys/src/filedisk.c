@@ -78,6 +78,7 @@ typedef struct _DEVICE_EXTENSION {
 DRIVER_INITIALIZE DriverEntry;
 __drv_dispatchType(IRP_MJ_CREATE) __drv_dispatchType(IRP_MJ_CLOSE) DRIVER_DISPATCH FileDiskCreateClose;
 __drv_dispatchType(IRP_MJ_READ) __drv_dispatchType(IRP_MJ_WRITE) DRIVER_DISPATCH FileDiskReadWrite;
+__drv_dispatchType(IRP_MJ_FLUSH_BUFFERS) DRIVER_DISPATCH FileDiskFlushBuffers;
 __drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH FileDiskDeviceControl;
 KSTART_ROUTINE FileDiskThread;
 DRIVER_UNLOAD FileDiskUnload;
@@ -114,6 +115,12 @@ FileDiskCreateClose (
 
 NTSTATUS
 FileDiskReadWrite (
+    IN PDEVICE_OBJECT   DeviceObject,
+    IN PIRP             Irp
+);
+
+NTSTATUS
+FileDiskFlushBuffers (
     IN PDEVICE_OBJECT   DeviceObject,
     IN PIRP             Irp
 );
@@ -254,6 +261,7 @@ DriverEntry (
     DriverObject->MajorFunction[IRP_MJ_CLOSE]          = FileDiskCreateClose;
     DriverObject->MajorFunction[IRP_MJ_READ]           = FileDiskReadWrite;
     DriverObject->MajorFunction[IRP_MJ_WRITE]          = FileDiskReadWrite;
+    DriverObject->MajorFunction[IRP_MJ_FLUSH_BUFFERS]  = FileDiskFlushBuffers;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = FileDiskDeviceControl;
 
     DriverObject->DriverUnload = FileDiskUnload;
@@ -534,6 +542,65 @@ FileDiskReadWrite (
         );
 
     return STATUS_PENDING;
+}
+
+NTSTATUS
+FileDiskFlushBuffers (
+    IN PDEVICE_OBJECT   DeviceObject,
+    IN PIRP             Irp
+    )
+{
+    PDEVICE_EXTENSION   device_extension;
+    PIO_STACK_LOCATION  io_stack;
+    NTSTATUS            status;
+
+    device_extension = (PDEVICE_EXTENSION) DeviceObject->DeviceExtension;
+
+    io_stack = IoGetCurrentIrpStackLocation(Irp);
+
+    if (!device_extension->media_in_device)
+    {
+        Irp->IoStatus.Status = STATUS_NO_MEDIA_IN_DEVICE;
+        Irp->IoStatus.Information = 0;
+
+        IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+        return STATUS_NO_MEDIA_IN_DEVICE;
+    }
+
+#if 0
+    /*
+     * We're a NOP, as we are always opened with |FILE_FLAG_NO_BUFFERING|,
+     * and calling |ZwFlushBuffersFile()| can deadlock with memory-mapped
+     * files, as seen with $ git clone ... # on NTFS stacked on a NTFS file
+     */
+    KdPrint(("FileDisk: FileDiskFlushBuffers: NOP\n"));
+
+    status = STATUS_SUCCESS;
+#else
+    IoMarkIrpPending(Irp);
+
+    KdPrint(("FileDisk: FileDiskFlushBuffers: Queuing irp=0x%p\n", Irp));
+
+    ExInterlockedInsertTailList(
+        &device_extension->list_head,
+        &Irp->Tail.Overlay.ListEntry,
+        &device_extension->list_lock
+        );
+
+    KeSetEvent(
+        &device_extension->request_event,
+        (KPRIORITY) 0,
+        FALSE
+        );
+
+    status = STATUS_PENDING;
+
+    KdPrint(("FileDisk: FileDiskFlushBuffers: status=0x%lx\n",
+        (long)status));
+#endif
+
+    return status;
 }
 
 NTSTATUS
@@ -1365,6 +1432,12 @@ FileDiskThread (
                     &io_stack->Parameters.Write.ByteOffset,
                     NULL
                     );
+                break;
+            case IRP_MJ_FLUSH_BUFFERS:
+                KdPrint(("FileDisk: --> async FileDiskFlushBuffers, irp=0x%p\n", irp));
+                (void)ZwFlushBuffersFile(device_extension->file_handle,
+                    &irp->IoStatus);
+                KdPrint(("FileDisk: <-- async FileDiskFlushBuffers, irp=0x%p\n", irp));
                 break;
 
             case IRP_MJ_DEVICE_CONTROL:
