@@ -31,7 +31,7 @@
 int FileDiskSyntax(void)
 {
     fprintf(stderr, "syntax:\n");
-    fprintf(stderr, "filedisk /mount  <devicenumber> <filename> [size[k|M|G] | /ro | /cd] <drive:>\n");
+    fprintf(stderr, "filedisk /mount  <devicenumber> <filename> [size[k|M|G|T|P|E] | /ro | /cd] <drive:>\n");
     fprintf(stderr, "filedisk /umount <drive:>\n");
     fprintf(stderr, "filedisk /status <drive:>\n");
     fprintf(stderr, "\n");
@@ -418,7 +418,25 @@ int __cdecl main(int argc, char* argv[])
             }
             else
             {
-                if (Option[strlen(Option) - 1] == 'G')
+                if (Option[strlen(Option) - 1] == 'E')
+                {
+                    OpenFileInformation->FileSize.QuadPart =
+                        _atoi64(Option) *
+                        1024LL * 1024LL * 1024LL * 1024LL * 1024LL * 1024LL;
+                }
+                else if (Option[strlen(Option) - 1] == 'P')
+                {
+                    OpenFileInformation->FileSize.QuadPart =
+                        _atoi64(Option) *
+                        1024LL * 1024LL * 1024LL * 1024LL * 1024LL;
+                }
+                else if (Option[strlen(Option) - 1] == 'T')
+                {
+                    OpenFileInformation->FileSize.QuadPart =
+                        _atoi64(Option) *
+                        1024LL * 1024LL * 1024LL * 1024LL;
+                }
+                else if (Option[strlen(Option) - 1] == 'G')
                 {
                     OpenFileInformation->FileSize.QuadPart =
                         _atoi64(Option) * 1024 * 1024 * 1024;
