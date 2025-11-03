@@ -54,7 +54,7 @@ ZwAdjustPrivilegesToken (
 
 #define NUMBEROFDEVICES_VALUE   L"NumberOfDevices"
 
-#define DEFAULT_NUMBEROFDEVICES 4
+#define DEFAULT_NUMBEROFDEVICES 128
 
 #define TOC_DATA_TRACK          0x04
 
