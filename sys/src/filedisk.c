@@ -1386,11 +1386,6 @@ FileDiskThread (
             NULL
             );
 
-        if (device_extension->terminate_thread)
-        {
-            PsTerminateSystemThread(STATUS_SUCCESS);
-        }
-
         while ((request = ExInterlockedRemoveHeadList(
             &device_extension->list_head,
             &device_extension->list_lock
@@ -1491,6 +1486,11 @@ FileDiskThread (
                 (CCHAR) (NT_SUCCESS(irp->IoStatus.Status) ?
                 IO_DISK_INCREMENT : IO_NO_INCREMENT)
                 );
+        }
+
+        if (device_extension->terminate_thread)
+        {
+            PsTerminateSystemThread(STATUS_SUCCESS);
         }
     }
 }
