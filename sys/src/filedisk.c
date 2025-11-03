@@ -23,6 +23,9 @@
 #include <mountmgr.h>
 #include <ntddvol.h>
 #include <ntddscsi.h>
+#define INITGUID
+#include <guiddef.h>
+#include <diskguid.h>
 
 NTSYSAPI
 NTSTATUS
@@ -878,6 +881,19 @@ FileDiskDeviceControl (
 
             length = device_extension->file_size.QuadPart;
 
+#if 1
+            partition_information_ex->PartitionStyle = PARTITION_STYLE_GPT;
+            partition_information_ex->StartingOffset.QuadPart = 0;
+            partition_information_ex->PartitionLength.QuadPart = length;
+            partition_information_ex->PartitionNumber = 0;
+            partition_information_ex->RewritePartition = FALSE;
+            (void)memcpy(&partition_information_ex->Gpt.PartitionType,
+                &PARTITION_BASIC_DATA_GUID, sizeof(GUID));
+            (void)memset(&partition_information_ex->Gpt.PartitionId, 0,
+                sizeof(GUID));
+            partition_information_ex->Gpt.Attributes = GPT_BASIC_DATA_ATTRIBUTE_NO_DRIVE_LETTER;
+            partition_information_ex->Gpt.Name[0] = L'\0';
+#else
             partition_information_ex->PartitionStyle = PARTITION_STYLE_MBR;
             partition_information_ex->StartingOffset.QuadPart = 0;
             partition_information_ex->PartitionLength.QuadPart = length;
@@ -887,6 +903,7 @@ FileDiskDeviceControl (
             partition_information_ex->Mbr.BootIndicator = FALSE;
             partition_information_ex->Mbr.RecognizedPartition = FALSE;
             partition_information_ex->Mbr.HiddenSectors = 1;
+#endif
 
             status = STATUS_SUCCESS;
             Irp->IoStatus.Information = sizeof(PARTITION_INFORMATION_EX);
