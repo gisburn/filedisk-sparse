@@ -789,19 +789,22 @@ FileDiskDeviceControl (
 
             length = device_extension->file_size.QuadPart;
 
-            if (device_extension->device_type != FILE_DEVICE_CD_ROM)
-            {
-                sector_size = 512;
-            }
-            else
+            if (device_extension->device_type == FILE_DEVICE_CD_ROM)
             {
                 sector_size = 2048;
             }
+            else
+            {
+                sector_size = 512;
+            }
 
-            disk_geometry->Cylinders.QuadPart = length / sector_size / 32 / 2;
+#define FILEDISK_SECTORSPERTRACK 32LL
+#define FILEDISK_TRACKSPERCYLINDER 2LL
+            disk_geometry->Cylinders.QuadPart =
+                length / ((ULONGLONG)(sector_size * FILEDISK_SECTORSPERTRACK * FILEDISK_TRACKSPERCYLINDER));
             disk_geometry->MediaType = FixedMedia;
-            disk_geometry->TracksPerCylinder = 2;
-            disk_geometry->SectorsPerTrack = 32;
+            disk_geometry->TracksPerCylinder = FILEDISK_TRACKSPERCYLINDER;
+            disk_geometry->SectorsPerTrack = FILEDISK_SECTORSPERTRACK;
             disk_geometry->BytesPerSector = sector_size;
 
             status = STATUS_SUCCESS;
