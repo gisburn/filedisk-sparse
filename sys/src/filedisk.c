@@ -1144,9 +1144,45 @@ FileDiskDeviceControl (
         }
     case IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES:
         {
-            KdPrint(("FileDisk: Unhandled ioctl IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES.\n"));
-            status = STATUS_INVALID_DEVICE_REQUEST;
-            Irp->IoStatus.Information = 0;
+            PDEVICE_MANAGE_DATA_SET_ATTRIBUTES in = (PDEVICE_MANAGE_DATA_SET_ATTRIBUTES)Irp->AssociatedIrp.SystemBuffer;
+
+            if ((in == NULL) || (in->Size < sizeof(*in))) {
+                status = STATUS_INVALID_PARAMETER;
+                Irp->IoStatus.Information = 0;
+                break;
+            }
+
+            ULONG action = in->Action & 0x7FFFFFFF; // strip non-destructive flag if present
+            switch (action) {
+                case DeviceDsmAction_Trim:
+                    const char *base = (const char *)in;
+                    if (in->DataSetRangesLength == 0) {
+                        status = STATUS_SUCCESS;
+                        Irp->IoStatus.Information = 0;
+                        break;
+                    }
+
+                    const DEVICE_DATA_SET_RANGE *ranges =
+                        (const DEVICE_DATA_SET_RANGE *)(base + in->DataSetRangesOffset);
+                    ULONG rangeCount = in->DataSetRangesLength / sizeof(*ranges);
+
+                    for (ULONG i = 0; i < rangeCount; ++i) {
+                        ULONGLONG start = ranges[i].StartingOffset;
+                        ULONGLONG len   = ranges[i].LengthInBytes;
+                        KdPrint(("FileDisk: "
+                            "DeviceDsmAction_Trim: range[%lu]: start=%llu, len=%llu",
+                            i, start, len));
+                    }
+
+                    status = STATUS_SUCCESS;
+                    Irp->IoStatus.Information = 0;
+                    break;
+                default:
+                    KdPrint(("FileDisk: Unhandled ioctl IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES.\n"));
+                    status = STATUS_INVALID_DEVICE_REQUEST;
+                    Irp->IoStatus.Information = 0;
+                    break;
+            }
             break;
         }
     case IOCTL_STORAGE_QUERY_PROPERTY:
