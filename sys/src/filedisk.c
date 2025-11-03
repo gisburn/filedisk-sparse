@@ -1187,10 +1187,33 @@ FileDiskDeviceControl (
         }
     case IOCTL_STORAGE_QUERY_PROPERTY:
         {
-            KdPrint(("FileDisk: Unhandled ioctl IOCTL_STORAGE_QUERY_PROPERTY.\n"));
-            status = STATUS_INVALID_DEVICE_REQUEST;
-            Irp->IoStatus.Information = 0;
-            break;
+            PSTORAGE_PROPERTY_QUERY q = (PSTORAGE_PROPERTY_QUERY)Irp->AssociatedIrp.SystemBuffer;
+
+            switch(q->PropertyId) {
+                case StorageDeviceTrimProperty:
+                {
+                    PDEVICE_TRIM_DESCRIPTOR d = (PDEVICE_TRIM_DESCRIPTOR)q;
+                    if (io_stack->Parameters.DeviceIoControl.OutputBufferLength < sizeof(*d)) {
+                        status = STATUS_BUFFER_OVERFLOW;
+                        Irp->IoStatus.Information = sizeof(*d);
+                        break;
+                    }
+                    RtlZeroMemory(d, sizeof(*d));
+                    d->Version = sizeof(*d);
+                    d->Size    = sizeof(*d);
+                    d->TrimEnabled = TRUE;
+                    Irp->IoStatus.Information = sizeof(*d);
+                    status = STATUS_SUCCESS;
+                }
+                    break;
+                default:
+                    KdPrint(("FileDisk: "
+                        "Unhandled ioctl IOCTL_STORAGE_QUERY_PROPERTY, PropertyId=%d.\n",
+                        (int)q->PropertyId));
+                    status = STATUS_INVALID_DEVICE_REQUEST;
+                    Irp->IoStatus.Information = 0;
+                    break;
+            }
         }
 
 #if (NTDDI_VERSION < NTDDI_VISTA)
